@@ -1,0 +1,11 @@
+[package]
+name = "pdfcraft-android-rfd"
+description = "The file-dialog API PdfCraft uses from rfd, answered by the Android app's system pickers (rfd has no Android backend)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]

@@ -1,0 +1,11 @@
+[package]
+name = "pdfcraft-android-clipboard"
+description = "The clipboard API PdfCraft uses from arboard, answered by the Android app's clipboard (arboard has no Android backend)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]

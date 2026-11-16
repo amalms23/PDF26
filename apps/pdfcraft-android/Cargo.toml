@@ -1,0 +1,31 @@
+[package]
+name = "pdfcraft-android"
+description = "PdfCraft for Android: the egui app as a native library for a GameActivity (build with `cargo xtask`-free steps in README.md)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+# Not `workspace = true`: the workspace forbids `unsafe`, and Android needs three small, documented
+# uses that no safe wrapper offers (the `android_main` export, the JavaVM handle and setting the
+# process environment before any thread reads it). The other workspace lints still apply below.
+[lints.rust]
+unsafe_code = "deny"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[target.'cfg(target_os = "android")'.dependencies]
+pdfcraft-ui-egui = { workspace = true }
+pdfcraft-android-rfd = { path = "../../crates/android-rfd" }
+pdfcraft-android-clipboard = { path = "../../crates/android-clipboard" }
+eframe = { workspace = true, features = ["default_fonts", "wgpu", "glow", "accesskit", "persistence", "android-game-activity"] }
+egui = { workspace = true }
+# The AndroidApp handle (the workspace patches winit to its fork).
+winit = { version = "0.30", default-features = false, features = ["android-game-activity"] }
+log = { workspace = true }
+# Calls into the app's Java activity (pickers, Open with, clipboard). Already in the tree through winit.
+jni = "0.22"
+# Logs to logcat (`adb logcat -s pdfcraft`).
+android_logger = { version = "0.15", default-features = false }
