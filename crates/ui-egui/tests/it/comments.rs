@@ -5958,3 +5958,53 @@ fn the_straight_highlighter_draws_level_lines_along_text() {
     // Held level (end 3 pt off over 180 pt): as tall as the marker is wide, from end to end.
     assert!(straight < 20.0 && (wide - 180.0).abs() < 25.0, "{straight} × {wide}");
 }
+
+/// A tablet shell with `TEXT_FIXTURE` open; `share` is the share sheet, if the platform has one.
+fn share_harness(share: Option<pdfcraft_ui_egui::ShareFn>) -> Harness<'static, PdfCraftApp> {
+    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(move |_cc| {
+        let mut app = PdfCraftApp::new();
+        app.set_option("language", "en").unwrap();
+        app.use_tablet_layout();
+        app.open_bytes("notes", None, TEXT_FIXTURE.to_vec()).unwrap();
+        app.share = share;
+        app
+    });
+    h.run_steps(4);
+    h
+}
+
+#[test]
+fn share_hands_over_the_pdf_with_its_unsaved_changes_and_leaves_it_unsaved() {
+    let shared = std::sync::Arc::new(std::sync::Mutex::new(Vec::<(String, Vec<u8>)>::new()));
+    let sink = shared.clone();
+    let mut h = share_harness(Some(Box::new(move |name, bytes| {
+        sink.lock().unwrap().push((name.to_string(), bytes.to_vec()));
+        Ok(())
+    })));
+    assert!(h.state_mut().add_note_page(pdfcraft_engine::NotePaper::Lined));
+    h.run_steps(2);
+    h.get_by_label("Share").click();
+    h.run_steps(2);
+    let shared = shared.lock().unwrap();
+    let [(name, bytes)] = shared.as_slice() else { panic!("shared {} times", shared.len()) };
+    assert_eq!(name, "notes.pdf", "named as a PDF");
+    let pages = pdfcraft_render::PageRenderer::new(std::sync::Arc::new(bytes.clone()), Default::default()).page_count();
+    assert_eq!(pages, 3, "the page added since opening is in what was shared");
+    let id = h.state().views[0].id;
+    assert!(h.state().session.get(id).unwrap().dirty, "sharing is not saving");
+}
+
+#[test]
+fn without_a_share_sheet_there_is_no_share_button() {
+    let h = share_harness(None);
+    h.get_by_label("Pen");
+    assert!(h.query_by_label("Share").is_none());
+}
+
+#[test]
+fn a_share_sheet_that_fails_says_so() {
+    let mut h = share_harness(Some(Box::new(|_, _| Err("no app on this device can take it".into()))));
+    h.get_by_label("Share").click();
+    h.run_steps(2);
+    assert!(h.query_by_label_contains("Couldn't share notes.pdf").is_some());
+}

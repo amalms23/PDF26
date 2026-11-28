@@ -19,6 +19,9 @@ const STILL: f64 = 0.05;
 const KEEP: usize = 3;
 /// The glide slows by `e` every this many seconds; it travels the lift speed times this.
 const TAU: f32 = 0.35;
+/// A finger's flick on a touch screen glides longer, as the platform's own lists do: with
+/// [`TAU`] it stopped well short of where a flick in other apps goes.
+const TOUCH_TAU: f32 = 0.75;
 /// Below this speed (points per second) a lift doesn't glide, and a glide stops.
 const START_SPEED: f32 = 150.0;
 const STOP_SPEED: f32 = 10.0;
@@ -39,6 +42,8 @@ pub(crate) struct Fling {
     at: f64,
     /// Passes in a row the glide moved the view not at all: it is against an edge.
     stalled: u8,
+    /// How slowly the glide slows: [`TAU`], or [`TOUCH_TAU`] after a finger's flick.
+    tau: f32,
 }
 
 impl Default for Fling {
@@ -49,7 +54,7 @@ impl Default for Fling {
 
 impl Fling {
     pub(crate) fn new(enabled: bool) -> Self {
-        Self { enabled, samples: Vec::new(), velocity: Vec2::ZERO, at: 0.0, stalled: 0 }
+        Self { enabled, samples: Vec::new(), velocity: Vec2::ZERO, at: 0.0, stalled: 0, tau: TAU }
     }
 
     pub(crate) fn gliding(&self) -> bool {
@@ -82,6 +87,7 @@ impl Fling {
                 TouchPhase::End => {
                     if glide && self.enabled {
                         self.velocity = self.lift_velocity(now);
+                        self.tau = TAU;
                         self.at = now;
                     }
                     self.samples.clear();
@@ -103,6 +109,7 @@ impl Fling {
     /// the passes come slower than [`STILL`].
     pub(crate) fn lift(&mut self, now: f64, frame: f64) {
         self.velocity = self.lift_velocity_within(now, STILL.max(frame * 1.5));
+        self.tau = TOUCH_TAU;
         self.at = now;
         self.stalled = 0;
         self.samples.clear();
@@ -151,7 +158,8 @@ impl Fling {
     }
 
     /// How far the glide moves the view in the pass at `now` (zero when not gliding), as the
-    /// exact distance a speed decaying with [`TAU`] covers since the last pass.
+    /// exact distance a speed decaying with its time constant ([`TAU`] or [`TOUCH_TAU`]) covers
+    /// since the last pass.
     pub(crate) fn step(&mut self, now: f64) -> Vec2 {
         if !self.gliding() {
             return Vec2::ZERO;
@@ -162,8 +170,8 @@ impl Fling {
             return Vec2::ZERO;
         }
         self.at = now;
-        let decay = (-(dt as f32) / TAU).exp();
-        let moved = self.velocity * TAU * (1.0 - decay);
+        let decay = (-(dt as f32) / self.tau).exp();
+        let moved = self.velocity * self.tau * (1.0 - decay);
         self.velocity *= decay;
         if self.velocity.length() < STOP_SPEED {
             self.stop();
@@ -234,6 +242,33 @@ mod tests {
         // Speed × TAU, less the tail under STOP_SPEED.
         assert!((-travelled - 1500.0 * TAU).abs() < 10.0, "travelled {travelled}");
         assert_eq!(fling.step(now + 1.0 / 60.0), Vec2::ZERO);
+    }
+
+    /// A finger's flick on a touch screen travels its speed times [`TOUCH_TAU`], further than a
+    /// touchpad's swipe at the same speed.
+    #[test]
+    fn a_finger_flick_glides_further_than_a_touchpad_swipe() {
+        let travel = |fling: &mut Fling, mut now: f64| {
+            let mut travelled = 0.0;
+            while fling.gliding() {
+                now += 1.0 / 60.0;
+                travelled += fling.step(now).y;
+            }
+            -travelled
+        };
+        let mut pad = Fling::new(true);
+        let now = swipe(&mut pad, -25.0, 6);
+        let pad_travel = travel(&mut pad, now);
+        let mut finger = Fling::new(true);
+        let mut now = 0.0;
+        for _ in 0..6 {
+            now += 1.0 / 60.0;
+            finger.drag(now, vec2(0.0, -25.0));
+        }
+        finger.lift(now, 1.0 / 60.0);
+        let finger_travel = travel(&mut finger, now);
+        assert!((finger_travel - 1500.0 * TOUCH_TAU).abs() < 15.0, "travelled {finger_travel}");
+        assert!(finger_travel > pad_travel * 2.0, "finger {finger_travel}, touchpad {pad_travel}");
     }
 
     #[test]

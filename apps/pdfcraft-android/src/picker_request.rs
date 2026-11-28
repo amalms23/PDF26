@@ -20,6 +20,14 @@ pub(crate) fn decode(answer: &str) -> Vec<std::path::PathBuf> {
     answer.lines().map(str::trim).filter(|l| !l.is_empty()).map(std::path::PathBuf::from).collect()
 }
 
+/// A document name as one visible file in a folder: no path separators, no NUL, no leading dots.
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+pub(crate) fn file_name(name: &str) -> String {
+    let clean: String = name.chars().map(|c| if matches!(c, '/' | '\\' | '\0') { '_' } else { c }).collect();
+    let clean = clean.trim().trim_start_matches('.').trim();
+    if clean.is_empty() { "document.pdf".into() } else { clean.into() }
+}
+
 /// `pdf` from the case-insensitive glob `[pP][dD][fF]` that `add_filter_any_case` passes to rfd,
 /// lowercased; anything but letters, digits, `-` and `_` is dropped.
 pub(crate) fn plain_extension(glob: &str) -> String {
@@ -60,6 +68,15 @@ mod tests {
     fn a_request_is_four_lines_and_newlines_in_names_cannot_add_more() {
         let r = encode("save", Some("Save\nas"), Some("a.pdf"), &["[pP][dD][fF]".into(), "pdf".into()]);
         assert_eq!(r, "save\nSave as\na.pdf\npdf");
+    }
+
+    #[test]
+    fn a_shared_file_name_stays_in_its_folder() {
+        assert_eq!(file_name("Notes.pdf"), "Notes.pdf");
+        assert_eq!(file_name("../../etc/x.pdf"), "_.._etc_x.pdf");
+        assert_eq!(file_name("a\\b\0c.pdf"), "a_b_c.pdf");
+        assert_eq!(file_name("..."), "document.pdf");
+        assert_eq!(file_name("  "), "document.pdf");
     }
 
     #[test]

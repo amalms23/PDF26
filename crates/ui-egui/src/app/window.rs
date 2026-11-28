@@ -23,6 +23,28 @@ impl PdfCraftApp {
         }
     }
 
+    /// Full screen on a tablet: a button in the top corner to leave it, as there is no Esc key
+    /// (or ⌘L) to press.
+    pub(super) fn full_screen_exit(&mut self, ctx: &egui::Context) {
+        let t = crate::theme::Tokens::get(ctx);
+        let leave = egui::Area::new(egui::Id::unique("full-screen-exit"))
+            .anchor(egui::Align2::RIGHT_TOP, egui::vec2(-16.0, 16.0))
+            .order(egui::Order::Foreground)
+            .show(ctx, |ui| {
+                egui::Frame::NONE
+                    .fill(t.card)
+                    .stroke(egui::Stroke::new(1.0, t.border))
+                    .corner_radius(egui::CornerRadius::same(10))
+                    .inner_margin(egui::Margin::same(4))
+                    .show(ui, |ui| crate::icons::button(ui, "minimize-2", 44.0, false, tl!("Exit full screen")).clicked())
+                    .inner
+            })
+            .inner;
+        if leave {
+            self.set_full_screen(ctx, false);
+        }
+    }
+
     /// Enter or leave full-screen reading (Acrobat: View ▸ Full Screen Mode, ⌘L).
     pub fn set_full_screen(&mut self, ctx: &egui::Context, on: bool) {
         self.apply_full_screen(on);

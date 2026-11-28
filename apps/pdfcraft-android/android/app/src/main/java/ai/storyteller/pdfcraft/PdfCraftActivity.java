@@ -3,6 +3,7 @@ package ai.storyteller.pdfcraft;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
@@ -18,6 +19,7 @@ import android.view.MotionEvent;
 import android.webkit.MimeTypeMap;
 import android.widget.Toast;
 
+import androidx.core.content.FileProvider;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
@@ -53,6 +55,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  *       cache and their local paths returned, because the app reads and writes files by path.
  *       Writes to those paths are copied back to the documents (see {@link #watch}).
  *   <li>{@link #waitForOpens}: files other apps send ("Open with", Share).
+ *   <li>{@link #share}: the share sheet, for the document the app wrote to the cache.
  *   <li>{@link #clipboardGet}, {@link #clipboardSet}: the clipboard's text.
  * </ul>
  */
@@ -156,6 +159,47 @@ public class PdfCraftActivity extends GameActivity {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return null;
+        }
+    }
+
+    // ---- Share ------------------------------------------------------------------------------
+
+    /**
+     * Shows the share sheet for the file at {@code path}, which the app wrote under
+     * {@code cache/share/} (the folder the FileProvider serves). Returns "1" when the sheet was
+     * shown, "0" otherwise. PDF26 itself is left out of the list.
+     */
+    public String share(String path) {
+        File file = new File(path);
+        Uri uri;
+        try {
+            uri = FileProvider.getUriForFile(this, getPackageName() + ".share", file);
+        } catch (IllegalArgumentException e) {
+            Log.w(TAG, "can't share " + path, e);
+            return "0";
+        }
+        Intent send = new Intent(Intent.ACTION_SEND);
+        send.setType(mimeFor(file.getName()));
+        send.putExtra(Intent.EXTRA_STREAM, uri);
+        send.putExtra(Intent.EXTRA_SUBJECT, file.getName());
+        send.setClipData(ClipData.newRawUri(file.getName(), uri));
+        send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        Intent chooser = Intent.createChooser(send, null);
+        chooser.putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, new ComponentName[] {new ComponentName(this, PdfCraftActivity.class)});
+        CompletableFuture<String> shown = new CompletableFuture<>();
+        runOnUiThread(() -> {
+            try {
+                startActivity(chooser);
+                shown.complete("1");
+            } catch (ActivityNotFoundException e) {
+                Log.w(TAG, "no app can take a shared file", e);
+                shown.complete("0");
+            }
+        });
+        try {
+            return shown.get();
+        } catch (Exception e) {
+            return "0";
         }
     }
 

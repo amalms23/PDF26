@@ -785,6 +785,8 @@ fn update_selection_on_press(ui: &egui::Ui, view: &mut DocView, text: &PageText,
         let (max_delay, max_dist) = ui.ctx().options(|options| (options.input_options.max_double_click_delay, options.input_options.max_click_dist));
         let consecutive = now - view.last_press_time <= max_delay && view.last_press_pos.is_some_and(|pos| pos.distance(gesture.pointer) <= max_dist);
         view.clicks = if consecutive { view.clicks.saturating_add(1) } else { 1 };
+        view.touch_clicks = ui.input(|input| input.any_touches());
+        cap_touch_clicks(view);
         view.last_press_time = now;
         view.last_press_pos = Some(gesture.pointer);
         let clicks = selection_click_count(view.clicks, gesture.tool);
@@ -807,6 +809,14 @@ fn update_selection_on_press(ui: &egui::Ui, view: &mut DocView, text: &PageText,
                 text.nearest(ox, oy).map(|anchor| Selection::run(gesture.page, anchor, anchor))
             };
         }
+    }
+}
+
+/// Taps on a touch screen select a word, then a line, and never the whole page: fingers that
+/// tap and scroll in quick succession selected it, which nobody reading on a tablet wants.
+fn cap_touch_clicks(view: &mut DocView) {
+    if view.touch_clicks {
+        view.clicks = view.clicks.min(3);
     }
 }
 
@@ -858,6 +868,7 @@ fn finish_text_pointer_gesture(ui: &egui::Ui, view: &mut DocView, text: &PageTex
     };
     if release_clicks > 0 {
         view.clicks = release_clicks;
+        cap_touch_clicks(view);
     }
     let clicks = selection_click_count(view.clicks, gesture.tool);
     if release_clicks > 0

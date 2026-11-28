@@ -1,6 +1,6 @@
 //! The tablet's tool strip, laid out as a handwriting app's: Undo and Redo, the writing tools
-//! (select, pen, highlighter, eraser, text), the current tool's colours and sizes one tap away,
-//! Add page, and a menu with the rest (shapes, notes, the Hand tool, Stylus only).
+//! (select, hand, pen, highlighter, eraser, text), the current tool's colours and sizes one tap away,
+//! Add page, and a menu with the rest (shapes, notes, Stylus only).
 //!
 //! It replaces the desktop strip's tool groups when [`PdfCraftApp::tablet`] is on; the tools
 //! themselves are the comment tools the desktop uses, so what is drawn is the same PDF markup.
@@ -151,6 +151,9 @@ pub(crate) fn show(ui: &mut egui::Ui, app: &mut PdfCraftApp, cell: f32, popup_al
     if icons::button(ui, "mouse-pointer-2", cell, app.quick_tool == QuickTool::Select, tl!("Select text and comments")).clicked() {
         app.quick_tool = QuickTool::Select;
     }
+    if icons::button(ui, "hand", cell, app.quick_tool == QuickTool::Hand, tl!("Hand tool")).clicked() {
+        app.quick_tool = QuickTool::Hand;
+    }
     tool_button(ui, app, cell, CommentTool::Ink, "pencil", tl!("Pen"));
     // The highlighter is one button for its three ways (freehand, straight, over text): it comes
     // back the way it was last used.
@@ -212,6 +215,9 @@ pub(crate) fn show(ui: &mut egui::Ui, app: &mut PdfCraftApp, cell: f32, popup_al
             }
         }
     });
+    if app.share.is_some() && app.active_ids().is_some() && icons::button(ui, "share-2", cell, false, tl!("Share")).clicked() {
+        app.share_active();
+    }
     let more = icons::button(ui, "ellipsis", cell, false, tl!("More tools"));
     egui::Popup::menu(&more).align(popup_align).gap(6.0).show(|ui| {
         let row = vec2(200.0, 40.0);
@@ -225,10 +231,6 @@ pub(crate) fn show(ui: &mut egui::Ui, app: &mut PdfCraftApp, cell: f32, popup_al
                 app.execute(tool.command());
                 ui.close();
             }
-        }
-        if ui.add(egui::Button::new(tl!("Hand tool")).min_size(row)).clicked() {
-            app.quick_tool = QuickTool::Hand;
-            ui.close();
         }
     });
 }

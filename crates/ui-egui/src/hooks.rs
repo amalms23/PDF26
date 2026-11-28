@@ -29,3 +29,7 @@ pub type HostSaveFn = Box<dyn Fn(&str, &[u8], bool) -> Result<(), String>>;
 /// Told every frame whether any tab has unsaved work, or an OCR review is not yet accepted or
 /// rejected, so a host page can warn before leaving.
 pub type HostDirtyFn = Box<dyn FnMut(bool)>;
+
+/// Hands the active document's PDF to the system's share sheet (Android): `(name, bytes)`. With
+/// it set, the tablet toolbar shows Share.
+pub type ShareFn = Box<dyn Fn(&str, &[u8]) -> Result<(), String>>;

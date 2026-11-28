@@ -30,6 +30,7 @@ fn android_main(app: AndroidApp) {
         log::warn!("no Java activity: file pickers and the clipboard are unavailable");
     }
     let keyboard = app.clone();
+    let cache = files.parent().map_or_else(|| files.join("cache"), |p| p.join("cache"));
     let options = eframe::NativeOptions {
         android_app: Some(app),
         // OpenGL ES runs on every Android device and emulator; Vulkan drivers vary too much.
@@ -52,6 +53,9 @@ fn android_main(app: AndroidApp) {
             }
             app.ocr_verify.dictionary_dir = pdfcraft_ui_egui::default_dictionary_dir();
             let shell_java = java.clone();
+            if let Some(java) = &shell_java {
+                app.share = Some(share_sheet(java.clone(), cache.clone()));
+            }
             if let Some(java) = java {
                 app.os_events = Some(listen_for_opens(java, cc.egui_ctx.clone()));
             }
@@ -108,6 +112,36 @@ fn listen_for_opens(java: Java, ctx: egui::Context) -> pdfcraft_ui_egui::OsEvent
         log::warn!("couldn't listen for Open with: {e}");
     }
     Box::new(move || rx.try_iter().map(OsEvent::Open).collect())
+}
+
+/// Share: the PDF is written to `cache/share/<n>/<name>` (the folder the activity's
+/// FileProvider serves) and handed to `PdfCraftActivity.share`, which shows the share sheet.
+fn share_sheet(java: Java, cache: PathBuf) -> pdfcraft_ui_egui::ShareFn {
+    Box::new(move |name, bytes| {
+        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or_default();
+        let root = cache.join("share");
+        forget_old_shares(&root);
+        let dir = root.join(stamp.to_string());
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        let file = dir.join(crate::picker_request::file_name(name));
+        std::fs::write(&file, bytes).map_err(|e| e.to_string())?;
+        match java.call(jni_str!("share"), &file.to_string_lossy()).as_deref() {
+            Some("1") => Ok(()),
+            _ => Err("no app on this device can take it".into()),
+        }
+    })
+}
+
+/// Removes copies shared over an hour ago: the app they went to has long since read them.
+fn forget_old_shares(root: &Path) {
+    let Ok(entries) = std::fs::read_dir(root) else { return };
+    let hour = std::time::Duration::from_secs(3600);
+    for entry in entries.flatten() {
+        let old = entry.metadata().and_then(|m| m.modified()).ok().and_then(|t| t.elapsed().ok()).is_some_and(|age| age > hour);
+        if old && let Err(e) = std::fs::remove_dir_all(entry.path()) {
+            log::warn!("couldn't remove an old shared copy: {e}");
+        }
+    }
 }
 
 /// The system document pickers, through `PdfCraftActivity.pick`.

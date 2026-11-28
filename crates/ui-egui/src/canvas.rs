@@ -612,6 +612,8 @@ pub struct DocView {
     /// Clicks in the current run on the text layer: two select a word, three the line, four the page.
     clicks: u32,
     last_press_time: f64,
+    /// The run of clicks is a touch screen's: it stops at the line, never the whole page.
+    touch_clicks: bool,
     last_press_pos: Option<Pos2>,
     /// Full screen: a click's page turn, when it falls due (input time) and which way. It waits
     /// out the double-click time, as the click may be the first of a double-click selecting a word.
@@ -1093,6 +1095,7 @@ impl DocView {
             touch_panned: Vec2::ZERO,
             finger_press: false,
             clicks: 0,
+            touch_clicks: false,
             last_press_time: 0.0,
             last_press_pos: None,
             present_turn: None,
@@ -2675,6 +2678,9 @@ struct ScrollGeometry<'a> {
     hand: bool,
 }
 
+/// A finger's press, in seconds, never long enough to be a long press.
+const NO_LONG_PRESS: f64 = 1.0e9;
+
 /// Who is touching the page: what the platform says of the touch, and whether only a stylus
 /// marks the page.
 #[derive(Clone, Copy)]
@@ -2713,6 +2719,12 @@ fn touch_pan(ui: &egui::Ui, view: &mut DocView, tool: QuickTool, now: f64, may_g
     }
     if pressed {
         view.finger_press = touching && touch.is_stylus != Some(true);
+        // A finger the platform names as one (Android) makes no long press: egui would end the
+        // press there (opening the page's menu), so a hand that rested before it scrolled could
+        // not scroll. The stylus and other touch screens keep it.
+        let finger = touching && touch.is_stylus == Some(false);
+        let default = egui::InputOptions::default().max_click_duration;
+        ctx.options_mut(|o| o.input_options.max_click_duration = if finger { NO_LONG_PRESS } else { default });
         view.touch_panned = Vec2::ZERO;
     }
     let finger = view.finger_press;
@@ -2730,6 +2742,11 @@ fn touch_pan(ui: &egui::Ui, view: &mut DocView, tool: QuickTool, now: f64, may_g
             // it moves, a handle it resizes): then it is that drag, as with the mouse.
             let held = view.router.keeps_drag();
             view.touch_pan = kept_from_finger || (tool == QuickTool::Select && finger && touching && !held && moved.length() >= click_dist);
+            if view.touch_pan {
+                // A press that scrolled is no click: the next press starts no double-click (quick
+                // flicks from one spot selected a word, a line, then the whole page).
+                view.last_press_pos = None;
+            }
         }
         if view.touch_pan {
             let delta = if started { ui.input(|i| i.pointer.total_drag_delta()).unwrap_or(Vec2::ZERO) } else { ui.input(|i| i.pointer.delta()) };

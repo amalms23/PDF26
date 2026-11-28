@@ -20,9 +20,11 @@ on Android phones and tablets, through egui's Android support and a GameActivity
   to egui as input-method text (`src/ime_diff.rs`). The keyboard's Enter (Go, Done) reaches
   `PdfCraftActivity.onEditorAction`, which the Rust side collects (`takeEnters`) and sends as the
   Enter key, so the page number box and search boxes act on it.
-- **Scrolling**: a finger dragged across the page pans it even with the Select tool on, and the
-  page glides on after a flick (`touch_pan` in `crates/ui-egui/src/canvas.rs`). A long press,
-  then a drag, selects text; a tap still opens links and form fields.
+- **Scrolling**: a finger dragged across the page pans it even with the Select tool on, however
+  long it rested first, and the page glides on after a flick, further than a touchpad swipe
+  (`touch_pan` in `crates/ui-egui/src/canvas.rs`, `TOUCH_TAU` in `canvas/fling.rs`). A finger
+  makes no long press; the stylus selects text, and taps select a word, then a line, never the
+  whole page. A tap still opens links and form fields.
 - **Stylus**: `PdfCraftActivity` tells the app whether each touch is a stylus or a finger
   (`touchTool`). Once a stylus has touched the screen, only it writes, highlights and draws while
   **Stylus only** is on (in the toolbar's ⋯ menu): a finger pans with every tool. Palm
@@ -30,10 +32,13 @@ on Android phones and tablets, through egui's Android support and a GameActivity
   as a palm, is ignored; one taken for a finger (down before the pen came near) is cancelled when
   the pen touches, and the page goes back to where it was (`touch_pan`); while the pen is down
   the app gets the pen alone, never the hand beside it.
-- **Notes toolbar** (`crates/ui-egui/src/notes_bar.rs`), across the top: Undo, Redo, Select, Pen,
-  Highlighter, Eraser, Text, Lasso, the current tool's colours and three sizes, Add page (blank,
-  lined, grid or dotted, after the page in view) and a ⋯ menu (Stylus only, shapes, sticky note,
-  Hand tool). Pen and highlighter strokes are smoothed when they finish.
+- **Notes toolbar** (`crates/ui-egui/src/notes_bar.rs`), across the top: Undo, Redo, Select,
+  Hand, Pen, Highlighter, Eraser, Text, Lasso, the current tool's colours and three sizes, Add
+  page (blank, lined, grid or dotted, after the page in view), Share and a ⋯ menu (Stylus only, shapes,
+  sticky note). Pen and highlighter strokes are smoothed when they finish.
+- **Share**: hands the open PDF, with its unsaved changes, to Android's share sheet (mail, Drive,
+  Messages, Print…). The document itself stays unsaved; the copy is written under `cache/share/`,
+  served to the other app by a FileProvider, and cleared an hour later.
 - **Lasso**: a loop drawn around writing selects it; a drag inside the dashed box moves it all,
   and the toolbar recolours, copies, pastes or deletes it.
 - **Hold to snap**: a pen stroke held still for half a second at its end becomes a clean line,
@@ -47,6 +52,7 @@ on Android phones and tablets, through egui's Android support and a GameActivity
   button (or its eraser end) erases while held on the screen; pressed with the pen over the
   screen (or as a stylus key, where the system passes those on), it switches to the eraser and
   back.
+- **Full screen**: a button in the top corner leaves it (there is no Esc key to press).
 - **Tablet layout**: no Print button (not done yet), keyboard-shortcut help, Discord button or
   shortcut hints; the All tools list starts closed.
 - **Name**: the Android build is called PDF26 (`app_name`), with its own launcher icon

@@ -39,6 +39,34 @@ impl PdfCraftApp {
         }
     }
 
+    /// Hand the active document, with its unsaved changes, to the system share sheet
+    /// ([`crate::ShareFn`]). The document itself stays as it is: still unsaved when it was.
+    /// Returns `true` if the share sheet was given the PDF.
+    pub fn share_active(&mut self) -> bool {
+        let Some((_, id)) = self.active_ids() else { return false };
+        if self.share.is_none() || !self.commit_typing_in(id) {
+            return false;
+        }
+        let Some(name) = self.session.get(id).map(|d| d.name.clone()) else { return false };
+        let name = if name.to_ascii_lowercase().ends_with(".pdf") { name } else { format!("{name}.pdf") };
+        let bytes = match self.session.save_bytes(id) {
+            Ok(b) => b,
+            Err(e) => {
+                self.notify_fmt("Couldn't share {name}: {e}", &[("name", &name), ("e", &e.to_string())]);
+                return false;
+            }
+        };
+        let shared = self.share.as_ref().map(|share| share(&name, &bytes));
+        match shared {
+            Some(Ok(())) => true,
+            Some(Err(e)) => {
+                self.notify_fmt("Couldn't share {name}: {e}", &[("name", &name), ("e", &e)]);
+                false
+            }
+            None => false,
+        }
+    }
+
     /// Save the document shown in tab `index`. Returns `true` if it was written now. When it has
     /// to ask where (a new document, or Save As) it returns `false` and saves on a later frame,
     /// once the user has chosen.

@@ -208,6 +208,7 @@ impl PdfCraftApp {
             unsaved_flag: Default::default(),
             os_events: None,
             host_save: None,
+            share: None,
             host_dirty: None,
             close_request: None,
             save_prompt_button: Default::default(),
@@ -895,6 +896,9 @@ impl PdfCraftApp {
                     }
                 }
             });
+            if self.tablet {
+                self.full_screen_exit(&ctx);
+            }
             dialogs::show(self, &ctx);
             // Notices too: a refused field value or a failed save must be seen in full screen.
             self.show_progress(&ctx);

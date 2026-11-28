@@ -2453,3 +2453,98 @@ fn a_cancelled_finger_pan_puts_the_page_back() {
         }
     }
 }
+
+/// Quick finger flicks that start from one spot on the page scroll it and select nothing. Each
+/// press counted toward a double, triple and quadruple click, so the flicks selected a word, a
+/// line and then the whole page.
+#[test]
+fn quick_finger_flicks_from_one_spot_select_no_text() {
+    let mut h = flick_harness(comment_on_text_pdf());
+    let a = at(&h, 222.0, 303.0);
+    assert_eq!(wait_for_cursor(&mut h, a, |c| c == egui::CursorIcon::Text), egui::CursorIcon::Text, "the page's text has arrived");
+    let start = page(&h);
+    for flick in 0..6 {
+        let b = a + egui::vec2(0.0, if flick % 2 == 0 { -14.0 } else { 14.0 });
+        one_frame(&mut h, [finger(egui::TouchPhase::Start, a), egui::Event::PointerMoved(a), press(a, true)]);
+        for i in 1..=3 {
+            let p = a + (b - a) * (i as f32 / 3.0);
+            one_frame(&mut h, [finger(egui::TouchPhase::Move, p), egui::Event::PointerMoved(p)]);
+        }
+        one_frame(&mut h, [finger(egui::TouchPhase::End, b), press(b, false), egui::Event::PointerGone]);
+        h.run_steps(2);
+        if flick == 0 {
+            assert_ne!(page(&h), start, "a flick scrolls the page");
+        }
+    }
+    h.run_steps(30);
+    assert_eq!(h.state().views[0].selected_text(), None, "the flicks selected no text");
+}
+
+/// A finger rested still on the page (past egui's click time) and then dragged scrolls the page, on
+/// Android where the platform says it is a finger: it selected text from where it rested.
+#[test]
+fn a_finger_rested_on_the_page_then_dragged_scrolls_it() {
+    let mut h = flick_harness(comment_on_text_pdf());
+    h.state_mut().touch_is_stylus = Some(false);
+    let a = at(&h, 222.0, 303.0);
+    assert_eq!(wait_for_cursor(&mut h, a, |c| c == egui::CursorIcon::Text), egui::CursorIcon::Text, "the page's text has arrived");
+    let start = page(&h);
+    one_frame(&mut h, [finger(egui::TouchPhase::Start, a), egui::Event::PointerMoved(a), press(a, true)]);
+    // A second and a half still.
+    h.run_steps(90);
+    let b = a - egui::vec2(0.0, 80.0);
+    for i in 1..=8 {
+        let p = a + (b - a) * (i as f32 / 8.0);
+        one_frame(&mut h, [finger(egui::TouchPhase::Move, p), egui::Event::PointerMoved(p)]);
+    }
+    one_frame(&mut h, [finger(egui::TouchPhase::End, b), press(b, false), egui::Event::PointerGone]);
+    h.run_steps(30);
+    assert!(page(&h).top() < start.top() - 40.0, "the finger scrolled the page: {start:?} → {:?}", page(&h));
+    assert_eq!(h.state().views[0].selected_text(), None, "it selected no text");
+}
+
+/// Taps on a touch screen select a word, then its line, and never the whole page.
+#[test]
+fn taps_select_a_word_then_a_line_never_the_page() {
+    let two_lines = stream("BT /F1 12 Tf 40 300 Td (First line of words.) Tj ET BT /F1 12 Tf 40 250 Td (Second line here.) Tj ET");
+    let pdf_bytes = pdf(&[
+        CATALOG,
+        PAGES,
+        "<< /Type /Page /Parent 2 0 R /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+        two_lines.as_str(),
+        HELVETICA,
+    ]);
+    let mut h = flick_harness(pdf_bytes);
+    let a = at(&h, 60.0, 303.0);
+    assert_eq!(wait_for_cursor(&mut h, a, |c| c == egui::CursorIcon::Text), egui::CursorIcon::Text, "the page's text has arrived");
+    for _ in 0..5 {
+        one_frame(&mut h, [finger(egui::TouchPhase::Start, a), egui::Event::PointerMoved(a), press(a, true)]);
+        one_frame(&mut h, [finger(egui::TouchPhase::End, a), press(a, false), egui::Event::PointerGone]);
+    }
+    h.run_steps(30);
+    assert_eq!(h.state().views[0].selected_text().as_deref(), Some("First line of words."), "the line, not the page");
+}
+
+fn flick_harness(bytes: Vec<u8>) -> Harness<'static, PdfCraftApp> {
+    // Frames 1/60 s apart, so presses follow each other within the double-click delay.
+    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).with_step_dt(1.0 / 60.0).build_eframe(move |_cc| {
+        let mut app = PdfCraftApp::new();
+        app.set_option("language", "en").unwrap();
+        app.open_bytes("test.pdf", None, bytes).unwrap();
+        app.set_option("left", "closed").unwrap();
+        app.set_option("zoom", "300").unwrap();
+        app
+    });
+    for _ in 0..60 {
+        h.run_steps(2);
+    }
+    h
+}
+
+fn finger(phase: egui::TouchPhase, pos: egui::Pos2) -> egui::Event {
+    egui::Event::Touch { device_id: egui::TouchDeviceId(1), id: egui::TouchId(1), phase, pos, force: None }
+}
+
+fn press(pos: egui::Pos2, pressed: bool) -> egui::Event {
+    egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE }
+}
