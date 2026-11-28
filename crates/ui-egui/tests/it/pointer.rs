@@ -2548,3 +2548,44 @@ fn finger(phase: egui::TouchPhase, pos: egui::Pos2) -> egui::Event {
 fn press(pos: egui::Pos2, pressed: bool) -> egui::Event {
     egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE }
 }
+
+/// One 300×400 page that is a single picture, as a scan is: no text.
+fn scanned_pdf() -> Vec<u8> {
+    let content = stream("q 300 0 0 400 0 0 cm /Im1 Do Q");
+    let image = String::from(
+        "<< /Type /XObject /Subtype /Image /Width 2 /Height 2 /ColorSpace /DeviceGray /BitsPerComponent 8 /Length 5 >>\nstream\n~~~~\nendstream",
+    );
+    pdf(&[
+        CATALOG,
+        PAGES,
+        "<< /Type /Page /Parent 2 0 R /Contents 4 0 R /Resources << /XObject << /Im1 5 0 R >> >> >>",
+        content.as_str(),
+        image.as_str(),
+    ])
+}
+
+/// On a scan the page is one picture, and the Select tool's click picks the picture under it: a
+/// finger rested on the page and lifted, or tapped, selected the whole page. A touch picks
+/// nothing; the mouse still picks it.
+#[test]
+fn a_finger_never_selects_a_scanned_page() {
+    let mut h = flick_harness(scanned_pdf());
+    h.state_mut().touch_is_stylus = Some(false);
+    let a = at(&h, 150.0, 200.0);
+    one_frame(&mut h, [finger(egui::TouchPhase::Start, a), egui::Event::PointerMoved(a), press(a, true)]);
+    h.run_steps(90);
+    one_frame(&mut h, [finger(egui::TouchPhase::End, a), press(a, false), egui::Event::PointerGone]);
+    h.run_steps(10);
+    assert_eq!(h.state().views[0].picked_image, None, "a rested finger picked the page's picture");
+    for _ in 0..4 {
+        one_frame(&mut h, [finger(egui::TouchPhase::Start, a), egui::Event::PointerMoved(a), press(a, true)]);
+        one_frame(&mut h, [finger(egui::TouchPhase::End, a), press(a, false), egui::Event::PointerGone]);
+    }
+    h.run_steps(30);
+    assert_eq!(h.state().views[0].picked_image, None, "taps picked the page's picture");
+    // The mouse.
+    one_frame(&mut h, [egui::Event::PointerMoved(a), press(a, true)]);
+    one_frame(&mut h, [press(a, false)]);
+    h.run_steps(10);
+    assert!(h.state().views[0].picked_image.is_some(), "a click picks the picture");
+}

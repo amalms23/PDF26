@@ -745,6 +745,10 @@ pub fn right_rail(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
         items.push(item(RightPanel::Accessibility, "accessibility", "Accessibility Checker", None));
     }
     items.push(item(RightPanel::Tags, "tag", "Tags", None));
+    // A tablet is a reader: its document's bookmarks and pages, nothing to inspect or edit.
+    if app.tablet {
+        items.retain(|i| matches!(i.pane, RightPanel::Bookmarks | RightPanel::Pages));
+    }
     let view = &mut app.views[index];
     let mut page_display = None;
     let rail = Rail::new(egui::Id::unique("rail"))
@@ -758,7 +762,8 @@ pub fn right_rail(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                 ui.spacing_mut().item_spacing.y = 2.0;
                 let right = app.side_panels.rail_on_right();
                 let dock_tip = if right { tl!("Dock navigation rail on Left") } else { tl!("Dock navigation rail on Right") };
-                if icons::button(ui, if right { "panel-left" } else { "panel-right" }, 32.0, false, dock_tip).clicked() {
+                // A tablet's rail stays where it is: one button less in its short column.
+                if !app.tablet && icons::button(ui, if right { "panel-left" } else { "panel-right" }, 32.0, false, dock_tip).clicked() {
                     app.side_panels.rail_side = if right { crate::side_panels::ToolsSide::Left } else { crate::side_panels::ToolsSide::Right };
                 }
                 // Between rotate and zoom, as in Acrobat. Its command runs once `view` is free.

@@ -609,6 +609,8 @@ pub struct DocView {
     touch_panned: Vec2,
     /// The press in progress, or the last one, is a finger on a touch screen (not a stylus).
     finger_press: bool,
+    /// The press in progress, or the last one, is a touch (finger or pen), not a mouse.
+    pub(crate) touch_press: bool,
     /// Clicks in the current run on the text layer: two select a word, three the line, four the page.
     clicks: u32,
     last_press_time: f64,
@@ -1094,6 +1096,7 @@ impl DocView {
             touch_pan: false,
             touch_panned: Vec2::ZERO,
             finger_press: false,
+            touch_press: false,
             clicks: 0,
             touch_clicks: false,
             last_press_time: 0.0,
@@ -2719,6 +2722,7 @@ fn touch_pan(ui: &egui::Ui, view: &mut DocView, tool: QuickTool, now: f64, may_g
     }
     if pressed {
         view.finger_press = touching && touch.is_stylus != Some(true);
+        view.touch_press = touching;
         // A finger the platform names as one (Android) makes no long press: egui would end the
         // press there (opening the page's menu), so a hand that rested before it scrolled could
         // not scroll. The stylus and other touch screens keep it.

@@ -34,8 +34,8 @@ on Android phones and tablets, through egui's Android support and a GameActivity
   the app gets the pen alone, never the hand beside it.
 - **Notes toolbar** (`crates/ui-egui/src/notes_bar.rs`), across the top: Undo, Redo, Select,
   Hand, Pen, Highlighter, Eraser, Text, Lasso, the current tool's colours and three sizes, Add
-  page (blank, lined, grid or dotted, after the page in view), Share and a ⋯ menu (Stylus only, shapes,
-  sticky note). Pen and highlighter strokes are smoothed when they finish.
+  page (blank, lined, grid or dotted, after the page in view), Find text, Save, Share and a ⋯
+  menu (Save as, Full screen, Document properties, Stylus only, shapes, sticky note). Pen and highlighter strokes are smoothed when they finish.
 - **Share**: hands the open PDF, with its unsaved changes, to Android's share sheet (mail, Drive,
   Messages, Print…). The document itself stays unsaved; the copy is written under `cache/share/`,
   served to the other app by a FileProvider, and cleared an hour later.
@@ -53,8 +53,12 @@ on Android phones and tablets, through egui's Android support and a GameActivity
   screen (or as a stylus key, where the system passes those on), it switches to the eraser and
   back.
 - **Full screen**: a button in the top corner leaves it (there is no Esc key to press).
-- **Tablet layout**: no Print button (not done yet), keyboard-shortcut help, Discord button or
-  shortcut hints; the All tools list starts closed.
+- **A reader, not a workbench**: no menu bar (File, Edit, View, Sign, Window, Help), mode tabs
+  (All tools, Edit, Convert, E-Sign), command search, hotbar settings, keyboard-shortcut help or
+  Discord button. The right rail keeps Bookmarks and Page thumbnails with page, zoom, fit, rotate
+  and page layout; the home screen keeps New notebook, Open a PDF and Recent (no recommended or
+  pinned tools, no pinned folders). A finger never selects a scanned page's picture (the Select
+  tool's click picks one only with a mouse).
 - **Name**: the Android build is called PDF26 (`app_name`), with its own launcher icon
   (`android/app/src/main/res/drawable/ic_launcher_*.xml`). As a modified version it shows no
   ArtCraft marks. The home screen offers New notebook (a lined page) and Open a PDF.

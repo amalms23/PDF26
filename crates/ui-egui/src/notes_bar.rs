@@ -215,12 +215,31 @@ pub(crate) fn show(ui: &mut egui::Ui, app: &mut PdfCraftApp, cell: f32, popup_al
             }
         }
     });
-    if app.share.is_some() && app.active_ids().is_some() && icons::button(ui, "share-2", cell, false, tl!("Share")).clicked() {
+    // What a reader needs of the File and Edit menus, which a tablet doesn't show.
+    let has_doc = app.active_ids().is_some();
+    ui.add_enabled_ui(has_doc, |ui| {
+        if icons::button(ui, "search", cell, false, tl!("Find text")).clicked() {
+            app.execute("edit.find");
+        }
+        if icons::button(ui, "save", cell, false, tl!("Save")).clicked() {
+            app.run_command("file.save");
+        }
+    });
+    if app.share.is_some() && has_doc && icons::button(ui, "share-2", cell, false, tl!("Share")).clicked() {
         app.share_active();
     }
     let more = icons::button(ui, "ellipsis", cell, false, tl!("More tools"));
     egui::Popup::menu(&more).align(popup_align).gap(6.0).show(|ui| {
         let row = vec2(200.0, 40.0);
+        for (id, label) in
+            [("file.save_as", tl!("Save as…")), ("view.full_screen", tl!("Full screen")), ("file.properties", tl!("Document properties"))]
+        {
+            if ui.add_enabled(has_doc, egui::Button::new(label).min_size(row)).clicked() {
+                app.run_command(id);
+                ui.close();
+            }
+        }
+        ui.separator();
         let mut stylus_only = app.stylus_only;
         if ui.add(crate::widgets::checkbox(&mut stylus_only, tl!("Stylus only: fingers scroll"))).changed() {
             app.stylus_only = stylus_only;

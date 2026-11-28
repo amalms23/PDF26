@@ -6008,3 +6008,52 @@ fn a_share_sheet_that_fails_says_so() {
     h.run_steps(2);
     assert!(h.query_by_label_contains("Couldn't share notes.pdf").is_some());
 }
+
+/// A tablet is a reader: no menus, modes or command search, a rail with the document's bookmarks
+/// and pages only, and Find and Save on the notes strip.
+#[test]
+fn the_tablet_shows_a_reader_not_the_desktop_tools() {
+    let mut h = share_harness(None);
+    for gone in [
+        "File",
+        "Help",
+        "Window",
+        "Sign",
+        "All tools",
+        "Convert",
+        "E-Sign",
+        "Find tools and commands",
+        "Layers",
+        "Attachments",
+        "Signatures",
+        "Tags",
+        "Form fields",
+        "Hotbar settings",
+    ] {
+        assert!(h.query_by_label(gone).is_none(), "{gone} is shown on a tablet");
+    }
+    for kept in ["Bookmarks", "Page thumbnails", "Pen", "Highlighter", "Save", "Find text"] {
+        h.get_by_label(kept);
+    }
+    h.get_by_label("Find text").click();
+    h.run_steps(3);
+    assert!(h.state().views[0].find.is_some(), "Find text opens the find bar");
+}
+
+/// PDF26's home screen: what to open and what was open, none of the workbench's tools or folders.
+#[test]
+fn the_reader_home_offers_only_opening_and_recent_files() {
+    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(|_cc| {
+        let mut app = PdfCraftApp::new();
+        app.set_option("language", "en").unwrap();
+        app.app_name = "PDF26";
+        app.use_tablet_layout();
+        app
+    });
+    h.run_steps(4);
+    h.get_by_label("Open a PDF");
+    h.get_by_label("New notebook");
+    for gone in ["Recommended tools", "Pinned Tools", "Pin a tool…", "Pin a folder…", "Join the ArtCraft community"] {
+        assert!(h.query_by_label(gone).is_none(), "{gone} is on the reader's home");
+    }
+}

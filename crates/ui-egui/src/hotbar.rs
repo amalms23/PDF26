@@ -150,8 +150,12 @@ impl Hotbar {
     }
 }
 
-/// Render the hotbar settings gear button and open the tool picker when clicked.
-fn settings_button(ui: &mut egui::Ui, cell: f32, picker_open: &mut bool) -> bool {
+/// Render the hotbar settings gear button and open the tool picker when clicked. A tablet has
+/// none: its notes strip is fixed, and the tools it would add are the desktop's.
+fn settings_button(ui: &mut egui::Ui, cell: f32, picker_open: &mut bool, tablet: bool) -> bool {
+    if tablet {
+        return false;
+    }
     let settings = ui
         .push_id("hotbar-settings", |ui| {
             icons::labeled_button(ui, "settings", cell, false, tl!("Hotbar settings"), tl!("Hotbar settings / add tools"))
@@ -648,6 +652,7 @@ pub(crate) fn show(app: &mut PdfCraftApp, area: Rect, page_left: Option<f32>, ui
     let was_picker_open = bar.picker_open;
     let mut picker_open = bar.picker_open;
     let mut settings_clicked = false;
+    let tablet = app.tablet;
     let shown = egui::Area::new(id).order(egui::Order::Middle).fixed_pos(pos).constrain_to(bounds).show(&ctx, |ui| {
         let frame = if full_side {
             egui::Frame::NONE.fill(t.chrome).corner_radius(egui::CornerRadius::ZERO).inner_margin(6)
@@ -673,7 +678,7 @@ pub(crate) fn show(app: &mut PdfCraftApp, area: Rect, page_left: Option<f32>, ui
             if full_side {
                 if bar.vertical {
                     ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
-                        settings_clicked |= settings_button(ui, cell, &mut picker_open);
+                        settings_clicked |= settings_button(ui, cell, &mut picker_open, tablet);
                         ui.add_space(4.0);
                         let remaining = ui.available_height().max(cell);
                         egui::ScrollArea::vertical().max_height(remaining).show(ui, |ui| {
@@ -689,7 +694,7 @@ pub(crate) fn show(app: &mut PdfCraftApp, area: Rect, page_left: Option<f32>, ui
                     });
                 } else {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        settings_clicked |= settings_button(ui, cell, &mut picker_open);
+                        settings_clicked |= settings_button(ui, cell, &mut picker_open, tablet);
                         ui.add_space(4.0);
                         let remaining = ui.available_width().max(cell);
                         egui::ScrollArea::horizontal().max_height(cell).max_width(remaining).show(ui, |ui| {
@@ -744,7 +749,7 @@ pub(crate) fn show(app: &mut PdfCraftApp, area: Rect, page_left: Option<f32>, ui
                                 }
                             });
                         });
-                        settings_clicked |= settings_button(ui, cell, &mut picker_open);
+                        settings_clicked |= settings_button(ui, cell, &mut picker_open, tablet);
                     } else {
                         core_tool_buttons(ui, app, cell, popup_align, &t);
                         active_tool_controls(ui, app, &t, false);
@@ -757,7 +762,7 @@ pub(crate) fn show(app: &mut PdfCraftApp, area: Rect, page_left: Option<f32>, ui
                                 });
                             });
                         }
-                        settings_clicked |= settings_button(ui, cell, &mut picker_open);
+                        settings_clicked |= settings_button(ui, cell, &mut picker_open, tablet);
                     }
                 });
             }

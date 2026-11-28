@@ -918,7 +918,9 @@ impl PdfCraftApp {
         // A document can hide the toolbars, the menu and the panels around it in its tab (ISO
         // 32000-2 Table 147); the tab strip stays, and F8 brings the rest back (`viewer_prefs`).
         let hidden = self.hidden_interface();
-        if !hidden.mode_bar(self.native_menu.is_some()) {
+        // A tablet is a reader: no menus, modes or command search; the notes strip and the rail
+        // hold what reading needs (`notes_bar`, `chrome::right_rail`).
+        if !hidden.mode_bar(self.native_menu.is_some()) && !self.tablet {
             chrome::mode_bar(self, ui);
         }
         // Another mode or the Home tab puts the OCR Verify screen away, as Exit does; Correct

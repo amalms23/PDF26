@@ -129,78 +129,90 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                 ui.add_space(22.0);
             }
 
-            egui::Frame::NONE
-                .fill(t.card)
-                .stroke(Stroke::new(1.0, t.border))
-                .corner_radius(CornerRadius::same(12))
-                .inner_margin(egui::Margin::same(18))
-                .show(ui, |ui| {
-                    ui.set_width(ui.available_width());
-                    ui.label(egui::RichText::new(tl!("Recommended tools")).font(theme::semibold(15.0)));
-                    ui.add_space(10.0);
-                    ui.horizontal_wrapped(|ui| {
-                        ui.spacing_mut().item_spacing = vec2(14.0, 14.0);
-                        for id in RECOMMENDED {
-                            if app.is_tool_pinned(id) {
-                                continue;
+            // PDF26 is a reader for one person's papers: none of the workbench's tools, pins or
+            // folders, only what to open and what was open.
+            if ours {
+                egui::Frame::NONE
+                    .fill(t.card)
+                    .stroke(Stroke::new(1.0, t.border))
+                    .corner_radius(CornerRadius::same(12))
+                    .inner_margin(egui::Margin::same(18))
+                    .show(ui, |ui| {
+                        ui.set_width(ui.available_width());
+                        ui.label(egui::RichText::new(tl!("Recommended tools")).font(theme::semibold(15.0)));
+                        ui.add_space(10.0);
+                        ui.horizontal_wrapped(|ui| {
+                            ui.spacing_mut().item_spacing = vec2(14.0, 14.0);
+                            for id in RECOMMENDED {
+                                if app.is_tool_pinned(id) {
+                                    continue;
+                                }
+                                let Some(g) = catalog::group(id) else { continue };
+                                tool_card(app, ui, &t, g, false);
                             }
-                            let Some(g) = catalog::group(id) else { continue };
-                            tool_card(app, ui, &t, g, false);
-                        }
-                        let (rect, resp) = ui.allocate_exact_size(vec2(170.0, 104.0), Sense::click());
-                        resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Open file")));
-                        let press = theme::Press::track(ui, &resp);
-                        card_lift(ui, &t, rect, press);
-                        ui.painter().rect(
-                            rect,
-                            CornerRadius::same(10),
-                            press.fill(t.pasteboard, t.hover, t.pressed),
-                            Stroke::new(1.0, t.divider),
-                            egui::StrokeKind::Inside,
-                        );
-                        let body = rect.translate(press.offset());
-                        icons::paint(ui, Rect::from_center_size(body.center() - vec2(0.0, 16.0), vec2(28.0, 28.0)), "folder-open", 26.0, t.icon);
-                        ui.painter().text(body.center() + vec2(0.0, 22.0), Align2::CENTER_CENTER, tl!("Open file"), theme::semibold(13.0), t.text);
-                        if theme::hand(resp).clicked() {
-                            app.open_dialog();
+                            let (rect, resp) = ui.allocate_exact_size(vec2(170.0, 104.0), Sense::click());
+                            resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Open file")));
+                            let press = theme::Press::track(ui, &resp);
+                            card_lift(ui, &t, rect, press);
+                            ui.painter().rect(
+                                rect,
+                                CornerRadius::same(10),
+                                press.fill(t.pasteboard, t.hover, t.pressed),
+                                Stroke::new(1.0, t.divider),
+                                egui::StrokeKind::Inside,
+                            );
+                            let body = rect.translate(press.offset());
+                            icons::paint(ui, Rect::from_center_size(body.center() - vec2(0.0, 16.0), vec2(28.0, 28.0)), "folder-open", 26.0, t.icon);
+                            ui.painter().text(
+                                body.center() + vec2(0.0, 22.0),
+                                Align2::CENTER_CENTER,
+                                tl!("Open file"),
+                                theme::semibold(13.0),
+                                t.text,
+                            );
+                            if theme::hand(resp).clicked() {
+                                app.open_dialog();
+                            }
+                        });
+                    });
+            }
+
+            if ours {
+                ui.add_space(26.0);
+                let mut unpin_tool = None;
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new(tl!("Pinned Tools")).font(theme::semibold(17.0)));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if widgets::ghost_button(ui, "pin", tl!("Pin a tool…")).clicked() {
+                            app.dialog = Some(crate::Dialog::PinTool);
                         }
                     });
                 });
-
-            ui.add_space(26.0);
-            let mut unpin_tool = None;
-            ui.horizontal(|ui| {
-                ui.label(egui::RichText::new(tl!("Pinned Tools")).font(theme::semibold(17.0)));
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if widgets::ghost_button(ui, "pin", tl!("Pin a tool…")).clicked() {
-                        app.dialog = Some(crate::Dialog::PinTool);
-                    }
-                });
-            });
-            ui.add_space(4.0);
-            if app.pinned_tools.is_empty() {
-                ui.label(egui::RichText::new(tl!("Pin your favorite tools here for quick access.")).color(t.text_muted));
-            } else {
-                ui.add_space(6.0);
-                let pinned = app.pinned_tools.clone();
-                ui.horizontal_wrapped(|ui| {
-                    ui.spacing_mut().item_spacing = vec2(14.0, 14.0);
-                    for id in &pinned {
-                        let Some(g) = catalog::group(id) else { continue };
-                        if let Some(to_unpin) = tool_card(app, ui, &t, g, true) {
-                            unpin_tool = Some(to_unpin);
+                ui.add_space(4.0);
+                if app.pinned_tools.is_empty() {
+                    ui.label(egui::RichText::new(tl!("Pin your favorite tools here for quick access.")).color(t.text_muted));
+                } else {
+                    ui.add_space(6.0);
+                    let pinned = app.pinned_tools.clone();
+                    ui.horizontal_wrapped(|ui| {
+                        ui.spacing_mut().item_spacing = vec2(14.0, 14.0);
+                        for id in &pinned {
+                            let Some(g) = catalog::group(id) else { continue };
+                            if let Some(to_unpin) = tool_card(app, ui, &t, g, true) {
+                                unpin_tool = Some(to_unpin);
+                            }
                         }
-                    }
-                });
-            }
-            if let Some(id) = unpin_tool {
-                app.unpin_tool(id);
-            }
+                    });
+                }
+                if let Some(id) = unpin_tool {
+                    app.unpin_tool(id);
+                }
 
-            #[cfg(not(target_arch = "wasm32"))]
-            {
-                ui.add_space(26.0);
-                crate::folders_ui::section(app, ui);
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    ui.add_space(26.0);
+                    crate::folders_ui::section(app, ui);
+                }
             }
 
             let mut clear = false;

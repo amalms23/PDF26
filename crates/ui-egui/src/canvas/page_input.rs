@@ -941,7 +941,10 @@ pub(super) fn page_overlays(ui: &mut egui::Ui, view: &mut DocView, frame: &mut P
     if tool != QuickTool::Select {
         view.pending_pick = None;
     } else if pick_sees && !input.consumed {
-        crate::image_pick::page_input(resp, &xf, i, info, doc, ptr, input.press == PagePress::Free, view);
+        // A touch picks no picture: on a scan the picture is the whole page, and a finger resting
+        // on it before it scrolls (or a tap) selected the page.
+        let pick = input.press == PagePress::Free && !view.touch_press;
+        crate::image_pick::page_input(resp, &xf, i, info, doc, ptr, pick, view);
     } else if resp.clicked() || ptr.drag_started {
         // Another owner took the press: an earlier click's picture, still being found, isn't picked.
         view.pending_pick = None;
